@@ -10,26 +10,27 @@
  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
  * specific language governing permissions and limitations under the License.
  */
+
 package com.alibaba.nacossync.extension.impl;
 
+import com.alibaba.nacos.api.exception.NacosException;
 import com.alibaba.nacos.api.naming.NamingService;
-import com.alibaba.nacos.api.naming.listener.EventListener;
-import com.alibaba.nacos.api.naming.listener.NamingEvent;
 import com.alibaba.nacos.api.naming.pojo.Instance;
 import com.alibaba.nacossync.cache.SkyWalkerCacheServices;
 import com.alibaba.nacossync.constant.ClusterTypeEnum;
-import com.alibaba.nacossync.constant.MetricsStatisticsType;
 import com.alibaba.nacossync.constant.SkyWalkerConstants;
-import com.alibaba.nacossync.extension.SyncService;
 import com.alibaba.nacossync.extension.annotation.NacosSyncService;
-import com.alibaba.nacossync.extension.holder.NacosServerHolder;
-import com.alibaba.nacossync.monitor.MetricsManager;
 import com.alibaba.nacossync.pojo.model.TaskDO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static com.alibaba.nacossync.util.NacosUtils.getGroupNameOrDefault;
 
 /**
  * @author yangyshdan
@@ -37,99 +38,61 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 
 @Slf4j
-@NacosSyncService(sourceCluster = ClusterTypeEnum.NACOS,destinationCluster = ClusterTypeEnum.NACOS)
-public class NacosSyncToNacosServiceImpl implements SyncService {
-    private Map<String, EventListener> nacosListenerMap = new ConcurrentHashMap<>();
-
-    @Autowired
-    private MetricsManager metricsManager;
-
+@NacosSyncService(sourceCluster = ClusterTypeEnum.NACOS, destinationCluster = ClusterTypeEnum.NACOS)
+public class NacosSyncToNacosServiceImpl extends AbstractNacosSync {
+    
+    
     @Autowired
     private SkyWalkerCacheServices skyWalkerCacheServices;
-
-    @Autowired
-    private NacosServerHolder nacosServerHolder;
-
+    
+    
     @Override
-    public boolean delete(TaskDO taskDO) {
+    public String composeInstanceKey(String ip, int port) {
+        return ip + ":" + port;
+    }
+    
+    @Override
+    public void register(TaskDO taskDO, Instance instance) {
+        NamingService destNamingService = getNacosServerHolder().get(taskDO.getDestClusterId());
         try {
-
-            NamingService sourceNamingService =
-                nacosServerHolder.get(taskDO.getSourceClusterId(), taskDO.getGroupName());
-            NamingService destNamingService = nacosServerHolder.get(taskDO.getDestClusterId(), taskDO.getGroupName());
-
-            sourceNamingService.unsubscribe(taskDO.getServiceName(), nacosListenerMap.get(taskDO.getTaskId()));
-
-            // 删除目标集群中同步的实例列表
-            List<Instance> instances = destNamingService.getAllInstances(taskDO.getServiceName());
-            for (Instance instance : instances) {
-                if (needDelete(instance.getMetadata(), taskDO)) {
-                    destNamingService.deregisterInstance(taskDO.getServiceName(), instance.getIp(), instance.getPort());
-                }
+            destNamingService.registerInstance(taskDO.getServiceName(), getGroupNameOrDefault(taskDO.getGroupName()),
+                    buildSyncInstance(instance, taskDO));
+        } catch (NacosException e) {
+            log.error("Register instance={} to Nacos failed", taskDO.getServiceName(), e);
+        }
+    }
+    
+    @Override
+    public void deregisterInstance(TaskDO taskDO) throws Exception {
+        NamingService destNamingService = getNacosServerHolder().get(taskDO.getDestClusterId());
+        List<Instance> allInstances = destNamingService.getAllInstances(taskDO.getServiceName(),
+                getGroupNameOrDefault(taskDO.getGroupName()), new ArrayList<>(), true);
+        for (Instance instance : allInstances) {
+            if (needDelete(instance.getMetadata(), taskDO)) {
+                destNamingService.deregisterInstance(taskDO.getServiceName(),
+                        getGroupNameOrDefault(taskDO.getGroupName()), instance.getIp(), instance.getPort());
             }
-        } catch (Exception e) {
-            log.error("delete task from nacos to nacos was failed, taskId:{}", taskDO.getTaskId(), e);
-            metricsManager.recordError(MetricsStatisticsType.DELETE_ERROR);
-            return false;
         }
-        return true;
     }
-
+    
     @Override
-    public boolean sync(TaskDO taskDO) {
-        try {
-            NamingService sourceNamingService =
-                nacosServerHolder.get(taskDO.getSourceClusterId(), taskDO.getGroupName());
-            NamingService destNamingService = nacosServerHolder.get(taskDO.getDestClusterId(), taskDO.getGroupName());
-
-            nacosListenerMap.putIfAbsent(taskDO.getTaskId(), event -> {
-                if (event instanceof NamingEvent) {
-                    try {
-                        Set instanceKeySet = new HashSet();
-                        List<Instance> sourceInstances = sourceNamingService.getAllInstances(taskDO.getServiceName());
-                        // 先将新的注册一遍
-                        for (Instance instance : sourceInstances) {
-                            if (needSync(instance.getMetadata())) {
-                                destNamingService.registerInstance(taskDO.getServiceName(),
-                                    buildSyncInstance(instance, taskDO));
-                                instanceKeySet.add(composeInstanceKey(instance));
-                            }
-                        }
-
-                        // 再将不存在的删掉
-                        List<Instance> destInstances = destNamingService.getAllInstances(taskDO.getServiceName());
-                        for (Instance instance : destInstances) {
-                            if (needDelete(instance.getMetadata(), taskDO)
-                                && !instanceKeySet.contains(composeInstanceKey(instance))) {
-                                destNamingService.deregisterInstance(taskDO.getServiceName(), instance.getIp(),
-                                    instance.getPort());
-                            }
-                        }
-                    } catch (Exception e) {
-                        log.error("event process fail, taskId:{}", taskDO.getTaskId(), e);
-                        metricsManager.recordError(MetricsStatisticsType.SYNC_ERROR);
-                    }
-                }
-            });
-
-            sourceNamingService.subscribe(taskDO.getServiceName(), nacosListenerMap.get(taskDO.getTaskId()));
-        } catch (Exception e) {
-            log.error("sync task from nacos to nacos was failed, taskId:{}", taskDO.getTaskId(), e);
-            metricsManager.recordError(MetricsStatisticsType.SYNC_ERROR);
-            return false;
+    public void removeInvalidInstance(TaskDO taskDO, Set<String> invalidInstanceKeys) {
+        NamingService destNamingService = getNacosServerHolder().get(taskDO.getDestClusterId());
+        
+        for (String instanceKey : invalidInstanceKeys) {
+            String[] split = instanceKey.split(":", -1);
+            try {
+                destNamingService.deregisterInstance(taskDO.getServiceName(),
+                        getGroupNameOrDefault(taskDO.getGroupName()), split[0], Integer.parseInt(split[1]));
+            } catch (NacosException e) {
+                log.error("Remove instance={} from Nacos failed", taskDO.getServiceName(), e);
+                
+            }
         }
-        return true;
     }
-
-    private String composeInstanceKey(Instance instance) {
-        return instance.getIp() + ":" + instance.getPort();
-    }
-
-
-
-
-
-    public Instance buildSyncInstance(Instance instance, TaskDO taskDO) {
+    
+    
+    private Instance buildSyncInstance(Instance instance, TaskDO taskDO) {
         Instance temp = new Instance();
         temp.setIp(instance.getIp());
         temp.setPort(instance.getPort());
@@ -138,14 +101,15 @@ public class NacosSyncToNacosServiceImpl implements SyncService {
         temp.setEnabled(instance.isEnabled());
         temp.setHealthy(instance.isHealthy());
         temp.setWeight(instance.getWeight());
-
-        Map<String, String> metaData = new HashMap<>();
-        metaData.putAll(instance.getMetadata());
+        temp.setEphemeral(instance.isEphemeral());
+        Map<String, String> metaData = new HashMap<>(instance.getMetadata());
         metaData.put(SkyWalkerConstants.DEST_CLUSTERID_KEY, taskDO.getDestClusterId());
         metaData.put(SkyWalkerConstants.SYNC_SOURCE_KEY,
-            skyWalkerCacheServices.getClusterType(taskDO.getSourceClusterId()).getCode());
+                skyWalkerCacheServices.getClusterType(taskDO.getSourceClusterId()).getCode());
         metaData.put(SkyWalkerConstants.SOURCE_CLUSTERID_KEY, taskDO.getSourceClusterId());
         temp.setMetadata(metaData);
         return temp;
     }
+    
+    
 }
