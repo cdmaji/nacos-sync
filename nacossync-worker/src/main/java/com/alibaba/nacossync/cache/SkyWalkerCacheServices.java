@@ -16,8 +16,7 @@
  */
 package com.alibaba.nacossync.cache;
 
-import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.TypeReference;
+
 import com.alibaba.nacossync.constant.ClusterTypeEnum;
 import com.alibaba.nacossync.dao.ClusterAccessService;
 import com.alibaba.nacossync.exception.SkyWalkerException;
@@ -25,14 +24,16 @@ import com.alibaba.nacossync.pojo.FinishedTask;
 import com.alibaba.nacossync.pojo.model.ClusterDO;
 import com.alibaba.nacossync.pojo.model.TaskDO;
 import com.alibaba.nacossync.util.SkyWalkerUtil;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import org.jboss.netty.util.internal.ThreadLocalRandom;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * @author NacosSync
@@ -40,24 +41,29 @@ import org.springframework.util.StringUtils;
  */
 @Service
 public class SkyWalkerCacheServices {
+    
+    private static final Map<String, FinishedTask> FINISHED_TASK_MAP = new ConcurrentHashMap<>();
+    
+    private final ClusterAccessService clusterAccessService;
 
-    @Autowired
-    private ClusterAccessService clusterAccessService;
-
-    private static Map<String, FinishedTask> finishedTaskMap = new ConcurrentHashMap<>();
-
+    private final ObjectMapper objectMapper;
+    
+    public SkyWalkerCacheServices(ClusterAccessService clusterAccessService, ObjectMapper objectMapper) {
+        this.clusterAccessService = clusterAccessService;
+        this.objectMapper = objectMapper;
+    }
+    
     public String getClusterConnectKey(String clusterId) {
         List<String> allClusterConnectKey = getAllClusterConnectKey(clusterId);
-
         return allClusterConnectKey.get(ThreadLocalRandom.current().nextInt(allClusterConnectKey.size()));
     }
 
+    @SneakyThrows
     public List<String> getAllClusterConnectKey(String clusterId) {
-        ClusterDO clusterDOS = clusterAccessService.findByClusterId(clusterId);
+        ClusterDO clusterDO = clusterAccessService.findByClusterId(clusterId);
 
-        List<String> connectKeyList = JSONObject.parseObject(clusterDOS.getConnectKeyList(),
-            new TypeReference<List<String>>() {
-            });
+        List<String> connectKeyList = objectMapper.readerForListOf(String.class)
+            .readValue(clusterDO.getConnectKeyList());
 
         if (CollectionUtils.isEmpty(connectKeyList)) {
             throw new SkyWalkerException("getClusterConnectKey empty, clusterId:" + clusterId);
@@ -79,23 +85,32 @@ public class SkyWalkerCacheServices {
         FinishedTask finishedTask = new FinishedTask();
         finishedTask.setOperationId(operationId);
 
-        finishedTaskMap.put(operationId, finishedTask);
+        FINISHED_TASK_MAP.put(operationId, finishedTask);
     }
 
     public FinishedTask getFinishedTask(TaskDO taskDO) {
 
         String operationId = SkyWalkerUtil.getOperationId(taskDO);
 
-        if (StringUtils.isEmpty(operationId)) {
+        if (!StringUtils.hasLength(operationId)) {
             return null;
         }
 
-        return finishedTaskMap.get(operationId);
+        return FINISHED_TASK_MAP.get(operationId);
+    }
+    
+    
+    public void removeFinishedTask(String operationId) {
+        if (!StringUtils.hasLength(operationId)) {
+            return;
+        }
+        FINISHED_TASK_MAP.remove(operationId);
     }
 
     public Map<String, FinishedTask> getFinishedTaskMap() {
 
-        return finishedTaskMap;
+        return FINISHED_TASK_MAP;
     }
+    
 
 }

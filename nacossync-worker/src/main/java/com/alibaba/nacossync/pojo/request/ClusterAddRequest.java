@@ -17,9 +17,9 @@
 package com.alibaba.nacossync.pojo.request;
 
 import com.alibaba.nacossync.constant.ClusterTypeEnum;
-import java.util.List;
-
 import lombok.Data;
+
+import java.util.List;
 
 /**
  * @author NacosSync
@@ -41,5 +41,17 @@ public class ClusterAddRequest extends BaseRequest {
      * @see ClusterTypeEnum
      */
     private String clusterType;
+
+    /**
+     * The username of the Nacos.
+     *
+     */
+    private String userName;
+
+    /**
+     * The password of the Nacos.
+     */
+    private String password;
+    private String namespace;
 
 }

@@ -1,5 +1,5 @@
 /******************************************/
-/*   DB name = nacos_Sync   */
+/*   DB name = nacos_sync   */
 /*   Table name = cluster   */
 /******************************************/
 CREATE TABLE `cluster` (
@@ -8,10 +8,14 @@ CREATE TABLE `cluster` (
   `cluster_name` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
   `cluster_type` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
   `connect_key_list` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
+  `user_name` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
+  `password` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
+  `namespace` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
+  `cluster_level` int default 0,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 /******************************************/
-/*   DB name = nacos_Sync   */
+/*   DB name = nacos_sync   */
 /*   Table name = system_config   */
 /******************************************/
 CREATE TABLE `system_config` (
@@ -20,9 +24,9 @@ CREATE TABLE `system_config` (
   `config_key` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
   `config_value` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 /******************************************/
-/*   DB name = nacos_Sync   */
+/*   DB name = nacos_sync   */
 /*   Table name = task   */
 /******************************************/
 CREATE TABLE `task` (
@@ -37,5 +41,6 @@ CREATE TABLE `task` (
   `task_status` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
   `version` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
   `worker_ip` varchar(255) COLLATE utf8mb4_bin DEFAULT NULL,
+  `status` int default null ,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

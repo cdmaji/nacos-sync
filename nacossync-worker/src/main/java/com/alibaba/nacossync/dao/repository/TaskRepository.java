@@ -16,15 +16,13 @@
  */
 package com.alibaba.nacossync.dao.repository;
 
-import java.util.List;
-
-import javax.transaction.Transactional;
-
+import com.alibaba.nacossync.pojo.model.TaskDO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.CrudRepository;
 
-import com.alibaba.nacossync.pojo.model.TaskDO;
+import javax.transaction.Transactional;
+import java.util.List;
 
 /**
  * @author NacosSync
@@ -36,10 +34,15 @@ public interface TaskRepository extends CrudRepository<TaskDO, Integer>, JpaRepo
     TaskDO findByTaskId(String taskId);
 
     @Transactional
-    int deleteByTaskId(String taskId);
+    void deleteByTaskId(String taskId);
     
     List<TaskDO> findAllByTaskIdIn(List<String> taskIds);
+    /**
+     * query service is all，use ns leven sync data
+     */
+    List<TaskDO> findAllByServiceNameEqualsIgnoreCase(String serviceName);
+    List<TaskDO> findAllByServiceNameNotIgnoreCase(String serviceName);
     
-    List<TaskDO> getAllByWorkerIp(String workerIp);
+    int countByDestClusterIdOrSourceClusterId(String destClusterId,String sourceClusterId);
 
 }

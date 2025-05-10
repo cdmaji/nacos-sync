@@ -19,7 +19,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * @author paderlol
@@ -48,9 +52,10 @@ public class NacosSyncToNacosServiceImplTest {
         TaskDO taskDO = mock(TaskDO.class);
         mockSync(taskDO);
         // TODO Test the core logic in the future
-        Assert.assertTrue(nacosSyncToNacosService.sync(taskDO));
+        Assert.assertTrue(nacosSyncToNacosService.sync(taskDO,null));
     }
-
+    
+    
     @Test
     public void testDeleteSyncToNacos() throws Exception {
         TaskDO taskDO = mock(TaskDO.class);
@@ -61,7 +66,7 @@ public class NacosSyncToNacosServiceImplTest {
 
     @Test(expected = Exception.class)
     public void testNacosSyncToNacosWithException() throws Exception {
-        Assert.assertFalse(nacosSyncToNacosService.sync(null));
+        Assert.assertFalse(nacosSyncToNacosService.sync(null, null));
     }
     @Test(expected = Exception.class)
     public void testNacosDeleteToNacosWithException() throws Exception {
@@ -72,8 +77,8 @@ public class NacosSyncToNacosServiceImplTest {
         when(taskDO.getTaskId()).thenReturn(TEST_TASK_ID);
         when(taskDO.getSourceClusterId()).thenReturn(TEST_SOURCE_CLUSTER_ID);
         when(taskDO.getDestClusterId()).thenReturn(TEST_DEST_CLUSTER_ID);
-        doReturn(destNamingService).when(nacosServerHolder).get(anyString(), any());
-        doReturn(sourceNamingService).when(nacosServerHolder).get(anyString(), any());
+        doReturn(destNamingService).when(nacosServerHolder).get(anyString());
+        doReturn(sourceNamingService).when(nacosServerHolder).get(anyString());
     }
 
     public void mockDelete(TaskDO taskDO) throws Exception {
@@ -81,11 +86,11 @@ public class NacosSyncToNacosServiceImplTest {
         when(taskDO.getTaskId()).thenReturn(TEST_TASK_ID);
         when(taskDO.getSourceClusterId()).thenReturn(TEST_SOURCE_CLUSTER_ID);
         when(taskDO.getDestClusterId()).thenReturn(TEST_DEST_CLUSTER_ID);
-        doReturn(destNamingService).when(nacosServerHolder).get(anyString(), anyString());
-        doReturn(sourceNamingService).when(nacosServerHolder).get(anyString(), anyString());
+        doReturn(destNamingService).when(nacosServerHolder).get(anyString());
+        doReturn(sourceNamingService).when(nacosServerHolder).get(anyString());
         doNothing().when(sourceNamingService).unsubscribe(any(), any());
         Map<String, String> metadata = Maps.newHashMap();
-        metadata.put(SkyWalkerConstants.SOURCE_CLUSTERID_KEY, TEST_SOURCE_CLUSTER_ID);
+        metadata.put(SkyWalkerConstants.SOURCE_CLUSTER_ID_KEY, TEST_SOURCE_CLUSTER_ID);
         List<Instance> allInstances = Lists.newArrayList(instance);
         doReturn(allInstances).when(sourceNamingService).getAllInstances(anyString());
         doReturn(metadata).when(instance).getMetadata();

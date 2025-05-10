@@ -1,5 +1,11 @@
 package com.alibaba.nacossync.extension.impl;
 
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.alibaba.nacos.api.naming.NamingService;
 import com.alibaba.nacos.api.naming.pojo.Instance;
 import com.alibaba.nacossync.cache.SkyWalkerCacheServices;
@@ -14,7 +20,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.netflix.appinfo.InstanceInfo;
 import com.netflix.discovery.shared.Application;
-import com.netflix.discovery.shared.transport.EurekaHttpResponse;
+import java.util.List;
+import java.util.Map;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,12 +29,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import java.util.List;
-import java.util.Map;
-
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * @author paderlol
@@ -60,7 +61,7 @@ public class EurekaSyncToNacosServiceImplTest {
     public void testEurekaSyncToNacos() throws Exception {
         TaskDO taskDO = mock(TaskDO.class);
         mockSync(taskDO);
-        Assert.assertTrue(eurekaSyncToNacosService.sync(taskDO));
+        Assert.assertTrue(eurekaSyncToNacosService.sync(taskDO,null));
     }
 
 
@@ -73,7 +74,7 @@ public class EurekaSyncToNacosServiceImplTest {
     }
     @Test(expected = Exception.class)
     public void testEurekaSyncToNacosWithException() throws Exception {
-        Assert.assertFalse(eurekaSyncToNacosService.sync(null));
+        Assert.assertFalse(eurekaSyncToNacosService.sync(null, null));
     }
     @Test(expected = Exception.class)
     public void testEurekaDeleteToNacosWithException() throws Exception {
@@ -93,8 +94,8 @@ public class EurekaSyncToNacosServiceImplTest {
         when(taskDO.getSourceClusterId()).thenReturn(TEST_SOURCE_CLUSTER_ID);
         when(taskDO.getDestClusterId()).thenReturn(TEST_DEST_CLUSTER_ID);
 
-        doReturn(destNamingService).when(nacosServerHolder).get(anyString(), any());
-        doReturn(eurekaNamingService).when(eurekaServerHolder).get(anyString(), any());
+        doReturn(destNamingService).when(nacosServerHolder).get(anyString());
+        doReturn(eurekaNamingService).when(eurekaServerHolder).get(anyString());
         doReturn(allInstanceInfo).when(eurekaNamingService).getApplications(any());
         when(application.getInstances()).thenReturn(allInstanceInfo);
         doReturn(ClusterTypeEnum.EUREKA).when(skyWalkerCacheServices).getClusterType(any());
@@ -105,9 +106,12 @@ public class EurekaSyncToNacosServiceImplTest {
         when(taskDO.getTaskId()).thenReturn(TEST_TASK_ID);
         when(taskDO.getSourceClusterId()).thenReturn(TEST_SOURCE_CLUSTER_ID);
         when(taskDO.getDestClusterId()).thenReturn(TEST_DEST_CLUSTER_ID);
-        doReturn(destNamingService).when(nacosServerHolder).get(anyString(), anyString());
+        doReturn(eurekaNamingService).when(eurekaServerHolder).get(anyString());
+        doReturn(destNamingService).when(nacosServerHolder).get(anyString());
+        List<InstanceInfo> eurekaInstances = Lists.newArrayList();
+        doReturn(eurekaInstances).when(eurekaNamingService).getApplications(anyString());
         Map<String, String> metadata = Maps.newHashMap();
-        metadata.put(SkyWalkerConstants.SOURCE_CLUSTERID_KEY, TEST_SOURCE_CLUSTER_ID);
+        metadata.put(SkyWalkerConstants.SOURCE_CLUSTER_ID_KEY, TEST_SOURCE_CLUSTER_ID);
         List<Instance> allInstances = Lists.newArrayList(instance);
         doReturn(allInstances).when(destNamingService).getAllInstances(anyString());
         doReturn(metadata).when(instance).getMetadata();

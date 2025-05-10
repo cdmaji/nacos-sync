@@ -14,24 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.alibaba.nacossync;
 
+import com.alibaba.nacossync.util.BatchTaskExecutor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-
 import org.springframework.cloud.netflix.eureka.EurekaClientAutoConfiguration;
-import springfox.documentation.swagger2.annotations.EnableSwagger2;
+import org.springframework.context.ConfigurableApplicationContext;
 
 /**
  * @author NacosSync
  * @version $Id: SkyWalkerMain.java, v 0.1 2018-09-24 PM12:42 NacosSync Exp $$
  */
-@EnableSwagger2
 @SpringBootApplication(exclude = EurekaClientAutoConfiguration.class)
 public class NacosSyncMain {
-
+    
     public static void main(String[] args) {
-
-        SpringApplication.run(NacosSyncMain.class, args);
+        
+        ConfigurableApplicationContext context = SpringApplication.run(NacosSyncMain.class, args);
+        
+        // Register shutdown callback using Spring Boot's context lifecycle
+        context.registerShutdownHook();
+        context.addApplicationListener(event -> {
+            if (event instanceof org.springframework.context.event.ContextClosedEvent) {
+                BatchTaskExecutor.shutdown();
+            }
+        });
     }
 }

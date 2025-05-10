@@ -14,8 +14,9 @@ package com.alibaba.nacossync.extension;
 
 import com.alibaba.nacossync.constant.SkyWalkerConstants;
 import com.alibaba.nacossync.pojo.model.TaskDO;
-import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+
+import java.util.Map;
 
 /**
  * @author NacosSync
@@ -30,20 +31,22 @@ public interface SyncService {
      * @return
      */
     boolean delete(TaskDO taskDO);
-
+    
     /**
-     * execute sync
      *
      * @param taskDO
+     * @param index
      * @return
      */
-    boolean sync(TaskDO taskDO);
+    boolean sync(TaskDO taskDO, Integer index);
 
     /**
      * Determines that the current instance data is from another source cluster
      */
     default boolean needSync(Map<String, String> sourceMetaData) {
-        return StringUtils.isBlank(sourceMetaData.get(SkyWalkerConstants.SOURCE_CLUSTERID_KEY));
+        boolean syncTag = StringUtils.isBlank(sourceMetaData.get(SkyWalkerConstants.SYNC_INSTANCE_TAG));
+        boolean blank = StringUtils.isBlank(sourceMetaData.get(SkyWalkerConstants.SOURCE_CLUSTER_ID_KEY));
+        return syncTag && blank;
     }
 
     /**
@@ -51,7 +54,7 @@ public interface SyncService {
      * cluster ID of the task
      */
     default boolean needDelete(Map<String, String> destMetaData, TaskDO taskDO) {
-        return StringUtils.equals(destMetaData.get(SkyWalkerConstants.SOURCE_CLUSTERID_KEY),
+        return StringUtils.equals(destMetaData.get(SkyWalkerConstants.SOURCE_CLUSTER_ID_KEY),
                 taskDO.getSourceClusterId());
     }
 
